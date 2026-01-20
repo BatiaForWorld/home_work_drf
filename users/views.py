@@ -2,16 +2,27 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
+from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
 
-from users.models import User
-from users.serializers import UserSerializer, UserRegistrationSerializer, LoginSerializer
+from users.models import User, Payments
+from users.serializers import UserSerializer, UserRegistrationSerializer, LoginSerializer, PaymentSerializer
 
 
 class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
 	queryset = User.objects.all()
 	serializer_class = UserSerializer
+
+
+class PaymentViewSet(ModelViewSet):
+	queryset = Payments.objects.all()
+	serializer_class = PaymentSerializer
+	filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+	filterset_fields = ["course_paid", "lesson_paid", "method_payment"]
+	ordering_fields = ["date_payment"]
+	ordering = ["-date_payment"]
 
 
 class UserRegistrationAPIView(APIView):
