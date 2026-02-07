@@ -34,6 +34,18 @@ class UserSerializer(serializers.ModelSerializer):
         return PaymentSerializer(queryset, many=True).data
 
 
+class UserPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id",
+            "first_name",
+            "last_name",
+            "avatar",
+        )
+        read_only_fields = ("id",)
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password1 = serializers.CharField(write_only=True)
     password2 = serializers.CharField(write_only=True)

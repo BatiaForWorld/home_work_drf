@@ -1,51 +1,65 @@
 from rest_framework import status
-from rest_framework.authtoken.models import Token
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.viewsets import GenericViewSet, ModelViewSet
-from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin
-from rest_framework import filters
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.viewsets import GenericViewSet
+from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin, ListModelMixin, DestroyModelMixin
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import User, Payments
-from users.serializers import UserSerializer, UserRegistrationSerializer, LoginSerializer, PaymentSerializer
+from users.models import User
+from users.permissions import IsOwner
+from users.serializers import UserSerializer, UserPublicSerializer, UserRegistrationSerializer, LoginSerializer
 
 
-class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, GenericViewSet):
+class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
 	queryset = User.objects.all()
 	serializer_class = UserSerializer
 
+	def get_permissions(self):
+		if self.action in {"list", "retrieve"}:
+			self.permission_classes = [IsAuthenticated]
+		elif self.action in {"update", "partial_update", "destroy"}:
+			self.permission_classes = [IsAuthenticated, IsOwner]
+		return [permission() for permission in self.permission_classes]
 
-class PaymentViewSet(ModelViewSet):
-	queryset = Payments.objects.all()
-	serializer_class = PaymentSerializer
-	filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
-	filterset_fields = ["course_paid", "lesson_paid", "method_payment"]
-	ordering_fields = ["date_payment"]
-	ordering = ["-date_payment"]
+	def get_serializer_class(self):
+		if self.action == "list":
+			return UserPublicSerializer
+		if self.action == "retrieve":
+			obj = self.get_object()
+			if self.request.user == obj:
+				return UserSerializer
+			return UserPublicSerializer
+		return UserSerializer
 
 
 class UserRegistrationAPIView(APIView):
+	permission_classes = []
+
 	def post(self, request, *args, **kwargs):
 		serializer = UserRegistrationSerializer(data=request.data)
 		serializer.is_valid(raise_exception=True)
 		user = serializer.save()
-		token, _ = Token.objects.get_or_create(user=user)
-		return Response({"token": token.key}, status=status.HTTP_201_CREATED)
+		refresh = RefreshToken.for_user(user)
+		return Response(
+			{"refresh": str(refresh), "access": str(refresh.access_token)},
+			status=status.HTTP_201_CREATED,
+		)
 
 
 class LoginAPIView(APIView):
+	permission_classes = []
+
 	def post(self, request, *args, **kwargs):
 		serializer = LoginSerializer(data=request.data, context={"request": request})
 		serializer.is_valid(raise_exception=True)
 		user = serializer.validated_data["user"]
-		token, _ = Token.objects.get_or_create(user=user)
-		return Response({"token": token.key})
+		refresh = RefreshToken.for_user(user)
+		return Response({"refresh": str(refresh), "access": str(refresh.access_token)})
 
 
 class LogoutAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+
 	def post(self, request, *args, **kwargs):
-		token = Token.objects.filter(user=request.user).first()
-		if token:
-			token.delete()
 		return Response(status=status.HTTP_204_NO_CONTENT)
