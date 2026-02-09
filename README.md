@@ -4,6 +4,10 @@
 
 ### Вьюсеты и дженерики (viewsets and generics)
 
+и
+
+### Сериализаторы
+
 Для установки проекта создайте проект и импортируйте его по ссылке github
 
 Создайте виртуальное окружение
@@ -26,8 +30,43 @@ pip install -r requirements.txt
 python3 manage.py migrate
 ```
 
+Загрузите фикстуры для заполнения БД
+
+```bash
+python3 manage.py loaddata users/fixtures/users.json
+python3 manage.py loaddata courses/fixtures/courses.json
+python3 manage.py loaddata courses/fixtures/lessons.json
+python3 manage.py loaddata users/fixtures/payments.json
+```
+
 Скачайте [Postman](https://dl.pstmn.io/download/latest/linux_64) для вашего дистрибутива Linux, распакуйте в удобную для
 вас папку и запустите
+
+# Права доступа в DRF 
+## JWT
+
+### Фикстуры
+Для добавления группы модераторов используйте фикстуру [users/fixtures/groups.json](users/fixtures/groups.json).
+
+Пример применения:
+
+```bash
+python3 manage.py loaddata users/fixtures/groups.json
+```
+Создайте администратора:
+```commandline
+python3 manage.py createsuperuser
+```
+После загрузки фикстуры назначайте пользователей в группу moderators через админ-панель.
+
+### Возможности проекта
+- Регистрация пользователей и JWT-аутентификация.
+- CRUD для пользователей (публичный и полный профиль в зависимости от владельца).
+- CRUD для курсов и уроков.
+- Разграничение прав: модераторы могут просматривать и редактировать любые курсы и уроки, но не создавать и не удалять.
+- Пользователи, не входящие в группу модераторов, видят и изменяют только свои курсы и уроки.
+
+
 
 
 Автор: Казанцев Андрей

@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -24,6 +25,15 @@ class Course(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="courses",
+        verbose_name="Владелец",
+        help_text="Укажите владельца курса",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Курс"
@@ -65,6 +75,15 @@ class Lesson(models.Model):
         null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="lessons",
+        verbose_name="Владелец",
+        help_text="Укажите владельца урока",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "Урок"
