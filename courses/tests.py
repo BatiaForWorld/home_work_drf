@@ -57,6 +57,19 @@ class LessonCrudTestCase(APITestCase):
 		response = self.client.delete(delete_url)
 		self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
+	def test_video_url_validator_rejects_external(self):
+		"""Проверяет запрет сторонних ссылок в поле видео."""
+		self.client.force_authenticate(user=self.owner)
+		create_url = reverse("courses:lesson_create")
+		payload = {
+			"title": "Lesson bad",
+			"course": self.course.id,
+			"video_url": "https://example.com/video",
+		}
+		response = self.client.post(create_url, data=payload)
+		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+		self.assertIn("video_url", response.data)
+
 	def test_other_user_cannot_update(self):
 		"""Проверяет запрет на изменение урока чужим пользователем."""
 		self.client.force_authenticate(user=self.other_user)
@@ -86,7 +99,7 @@ class SubscriptionTestCase(APITestCase):
 
 		response = self.client.post(subscribe_url, data={"course_id": self.course.id})
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
-		self.assertEqual(response.data["message"], "подписка добавлена")
+		self.assertEqual(response.data, {"message": "подписка добавлена"})
 		self.assertTrue(
 			Subscription.objects.filter(user=self.user, course=self.course).exists()
 		)
@@ -102,3 +115,12 @@ class SubscriptionTestCase(APITestCase):
 		self.assertFalse(
 			Subscription.objects.filter(user=self.user, course=self.course).exists()
 		)
+
+	def test_courses_pagination_structure(self):
+		"""Проверяет наличие ключей пагинации в выдаче курсов."""
+		self.client.force_authenticate(user=self.user)
+		courses_url = reverse("courses:courses-list")
+		response = self.client.get(courses_url)
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertIn("count", response.data)
+		self.assertIn("results", response.data)
