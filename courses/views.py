@@ -1,8 +1,12 @@
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveAPIView, UpdateAPIView, DestroyAPIView
+from django.shortcuts import get_object_or_404
 
-from courses.models import Course, Lesson
+from courses.models import Course, Lesson, Subscription
+from courses.paginators import CourseLessonPagination
 from courses.serializers import CourseSerializer, LessonSerializer
 from users.permissions import IsModer, IsOwner
 
@@ -10,17 +14,25 @@ from users.permissions import IsModer, IsOwner
 class CourseViewSet(ModelViewSet):
     queryset = Course.objects.all()
     serializer_class = CourseSerializer
+    pagination_class = CourseLessonPagination
 
     def get_queryset(self):
+        """Возвращает курсы в зависимости от роли пользователя."""
         user = self.request.user
-        if user.is_authenticated and user.groups.filter(name="moderators").exists():
+        if not user or not user.is_authenticated:
+            return Course.objects.none()
+        if self.action in {"list", "retrieve"}:
+            return Course.objects.all()
+        if user.groups.filter(name="moderators").exists():
             return Course.objects.all()
         return Course.objects.filter(owner=user)
 
     def perform_create(self, serializer):
+        """Сохраняет курс с владельцем из запроса."""
         serializer.save(owner=self.request.user)
 
     def get_permissions(self):
+        """Назначает права доступа в зависимости от действия."""
         if self.action in {"list", "retrieve"}:
             self.permission_classes = [IsAuthenticated]
         elif self.action == "create":
@@ -38,6 +50,7 @@ class LessonCreateAPIView(CreateAPIView):
     permission_classes = [IsAuthenticated, ~IsModer]
 
     def perform_create(self, serializer):
+        """Сохраняет урок с владельцем из запроса."""
         serializer.save(owner=self.request.user)
 
 
@@ -45,8 +58,10 @@ class LessonListAPIView(ListAPIView):
     queryset = Lesson.objects.all()
     serializer_class = LessonSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = CourseLessonPagination
 
     def get_queryset(self):
+        """Возвращает список уроков в зависимости от роли пользователя."""
         user = self.request.user
         if user.is_authenticated and user.groups.filter(name="moderators").exists():
             return Lesson.objects.all()
@@ -59,6 +74,7 @@ class LessonRetrieveAPIView(RetrieveAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        """Возвращает доступные уроки для просмотра."""
         user = self.request.user
         if user.is_authenticated and user.groups.filter(name="moderators").exists():
             return Lesson.objects.all()
@@ -71,6 +87,7 @@ class LessonUpdateAPIView(UpdateAPIView):
     permission_classes = [IsAuthenticated, IsModer | IsOwner]
 
     def get_queryset(self):
+        """Возвращает доступные уроки для изменения."""
         user = self.request.user
         if user.is_authenticated and user.groups.filter(name="moderators").exists():
             return Lesson.objects.all()
@@ -83,7 +100,27 @@ class LessonDestroyAPIView(DestroyAPIView):
     permission_classes = [IsAuthenticated, IsOwner & ~IsModer]
 
     def get_queryset(self):
+        """Возвращает доступные уроки для удаления."""
         user = self.request.user
         if user.is_authenticated and user.groups.filter(name="moderators").exists():
             return Lesson.objects.all()
         return Lesson.objects.filter(owner=user)
+
+
+class SubscriptionAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        """Добавляет или удаляет подписку пользователя на курс."""
+        course_id = request.data.get("course_id")
+        course_item = get_object_or_404(Course, pk=course_id)
+        subs_item = Subscription.objects.filter(user=request.user, course=course_item)
+
+        if subs_item.exists():
+            subs_item.delete()
+            message = "подписка удалена"
+        else:
+            Subscription.objects.create(user=request.user, course=course_item)
+            message = "подписка добавлена"
+
+        return Response({"message": message})
