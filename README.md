@@ -19,6 +19,10 @@ pip install -r requirements.txt
 ```
 
 Заполните файл .env по примеру env.example, указав данные для соединения с БД postgreSQL.
+Также заполните тестовые настройки Stripe:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_SUCCESS_URL`
+- `STRIPE_CANCEL_URL`
 
 Выполните миграции
 
@@ -66,6 +70,10 @@ python3 manage.py createsuperuser
 
 Реализована пагинация для вывода всех уроков и курсов.
 
+Реализована документация API через Swagger и Redoc.
+
+Реализована интеграция оплаты курсов через Stripe Checkout.
+
 Написаны тесты, которые проверяют корректность работы CRUD уроков и функционал работы подписки на обновления курса.
 
 Сохранены результат проверки покрытия тестами.
@@ -101,6 +109,98 @@ coverage run --source='.' manage.py test
 ```commandline
 coverage html -d htgmlcov
 ```
+
+## Документация API
+
+- Swagger UI: `/swagger/`
+- OpenAPI JSON/YAML: `/swagger<format>/`
+- ReDoc: `/redoc/`
+
+## Оплата Stripe
+
+Эндпоинты:
+- `GET /users/payments/` — список платежей пользователя (модератор видит все).
+- `POST /users/payments/create/` — создать платеж и получить ссылку на оплату (`payment_link`).
+
+При создании платежа система автоматически создаёт в Stripe:
+- Product
+- Price (сумма передаётся в копейках)
+- Checkout Session
+
+Взаимодействие со Stripe вынесено в сервисные функции приложения `users`.
+
+## Полный сценарий запросов (curl)
+
+Ниже минимальный рабочий сценарий от регистрации до получения ссылки Stripe.
+
+1) Регистрация (без Authorization):
+
+```bash
+curl -X POST http://localhost:8000/users/register/ \
+	-H "Content-Type: application/json" \
+	-d '{
+		"email": "vasia@example.com",
+		"password1": "vasia12345",
+		"password2": "vasia12345"
+	}'
+```
+
+2) Логин (без Authorization):
+
+```bash
+curl -X POST http://localhost:8000/users/login/ \
+	-H "Content-Type: application/json" \
+	-d '{
+		"email": "vasia@example.com",
+		"password": "vasia12345"
+	}'
+```
+
+3) Обновить access по refresh:
+
+```bash
+curl -X POST http://localhost:8000/users/token/refresh/ \
+	-H "Content-Type: application/json" \
+	-d '{
+		"refresh": "<YOUR_REFRESH_TOKEN>"
+	}'
+```
+
+4) Создать курс с ценой (нужен для оплаты):
+
+```bash
+curl -X POST http://localhost:8000/courses/ \
+	-H "Content-Type: application/json" \
+	-H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
+	-d '{
+		"title": "Python Pro",
+		"description": "Оплачиваемый курс",
+		"price": 500
+	}'
+```
+
+5) Создать платеж и получить `payment_link` Stripe:
+
+```bash
+curl -X POST http://localhost:8000/users/payments/create/ \
+	-H "Content-Type: application/json" \
+	-H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
+	-d '{
+		"course": 1
+	}'
+```
+
+6) Получить список своих платежей:
+
+```bash
+curl -X GET http://localhost:8000/users/payments/ \
+	-H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
+```
+
+Если приходит `token_not_valid` или `Token is expired`:
+- получите новый `access` через `/users/token/refresh/`;
+- или заново войдите через `/users/login/`.
+- убедитесь, что на `/users/register/` и `/users/login/` вы не отправляете старый `Authorization`.
 
 
 Автор: Казанцев Андрей
