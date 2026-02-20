@@ -28,6 +28,7 @@ class CourseSerializer(serializers.ModelSerializer):
             "title",
             "preview",
             "description",
+            "price",
             "created_at",
             "updated_at",
             "owner",
@@ -41,3 +42,7 @@ class CourseSerializer(serializers.ModelSerializer):
         if not request or not request.user or not request.user.is_authenticated:
             return False
         return Subscription.objects.filter(user=request.user, course=obj).exists()
+
+
+class SubscriptionActionSerializer(serializers.Serializer):
+    course_id = serializers.IntegerField()

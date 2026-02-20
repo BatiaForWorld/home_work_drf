@@ -1,17 +1,41 @@
+import stripe
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from rest_framework.generics import CreateAPIView, ListAPIView
+from rest_framework.mixins import (
+	DestroyModelMixin,
+	ListModelMixin,
+	RetrieveModelMixin,
+	UpdateModelMixin,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
-from rest_framework.mixins import RetrieveModelMixin, UpdateModelMixin, ListModelMixin, DestroyModelMixin
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import User
+from users.models import Payment, User
 from users.permissions import IsOwner
-from users.serializers import UserSerializer, UserPublicSerializer, UserRegistrationSerializer, LoginSerializer
+from users.serializers import (
+	LoginSerializer,
+	PaymentCreateSerializer,
+	PaymentSerializer,
+	UserPublicSerializer,
+	UserRegistrationSerializer,
+	UserSerializer,
+)
+from users.service import (
+	amount_to_kopecks,
+	create_stripe_price,
+	create_stripe_product,
+	create_stripe_session,
+)
 
 
 class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, ListModelMixin, DestroyModelMixin, GenericViewSet):
+	"""CRUD-представление профиля пользователя."""
+
 	queryset = User.objects.all()
 	serializer_class = UserSerializer
 
@@ -34,7 +58,10 @@ class UserProfileViewSet(RetrieveModelMixin, UpdateModelMixin, ListModelMixin, D
 
 
 class UserRegistrationAPIView(APIView):
+	"""Регистрация пользователя с выдачей JWT-токенов."""
+
 	permission_classes = []
+	authentication_classes = []
 
 	def post(self, request, *args, **kwargs):
 		serializer = UserRegistrationSerializer(data=request.data)
@@ -48,7 +75,10 @@ class UserRegistrationAPIView(APIView):
 
 
 class LoginAPIView(APIView):
+	"""Аутентификация пользователя и выдача JWT-токенов."""
+
 	permission_classes = []
+	authentication_classes = []
 
 	def post(self, request, *args, **kwargs):
 		serializer = LoginSerializer(data=request.data, context={"request": request})
@@ -59,7 +89,69 @@ class LoginAPIView(APIView):
 
 
 class LogoutAPIView(APIView):
+	"""Выход пользователя (stateless для JWT)."""
+
 	permission_classes = [IsAuthenticated]
 
 	def post(self, request, *args, **kwargs):
 		return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class PaymentCreateAPIView(CreateAPIView):
+	"""Создает платеж, а также Product/Price/Checkout Session в Stripe."""
+
+	queryset = Payment.objects.all()
+	serializer_class = PaymentCreateSerializer
+	permission_classes = [IsAuthenticated]
+
+	@swagger_auto_schema(request_body=PaymentCreateSerializer, responses={201: PaymentSerializer})
+	def post(self, request, *args, **kwargs):
+		return super().post(request, *args, **kwargs)
+
+	def perform_create(self, serializer):
+		"""Создает Stripe-сущности и сохраняет ссылку оплаты в локальном платеже."""
+		course = serializer.validated_data["course"]
+		if course.price <= 0:
+			raise ValidationError({"course": "Цена курса должна быть больше 0."})
+
+		amount_in_kopecks = amount_to_kopecks(course.price)
+
+		try:
+			stripe_product = create_stripe_product(course.title, course.description or "")
+			stripe_price = create_stripe_price(stripe_product["id"], amount_in_kopecks)
+			stripe_session = create_stripe_session(stripe_price["id"])
+		except stripe.error.StripeError as exc:
+			raise ValidationError({"stripe": str(exc)}) from exc
+
+		serializer.instance = Payment.objects.create(
+			user=self.request.user,
+			course=course,
+			amount=course.price,
+			stripe_product_id=stripe_product["id"],
+			stripe_price_id=stripe_price["id"],
+			stripe_session_id=stripe_session["id"],
+			payment_link=stripe_session["url"],
+		)
+
+	def create(self, request, *args, **kwargs):
+		"""Возвращает полный объект платежа с `payment_link` после создания."""
+		serializer = self.get_serializer(data=request.data)
+		serializer.is_valid(raise_exception=True)
+		self.perform_create(serializer)
+		output_serializer = PaymentSerializer(serializer.instance)
+		headers = self.get_success_headers(output_serializer.data)
+		return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class PaymentListAPIView(ListAPIView):
+	"""Возвращает платежи: свои для пользователя, все для модератора."""
+
+	serializer_class = PaymentSerializer
+	permission_classes = [IsAuthenticated]
+
+	def get_queryset(self):
+		"""Выбирает набор платежей в зависимости от роли пользователя."""
+		user = self.request.user
+		if user.groups.filter(name="moderators").exists():
+			return Payment.objects.all()
+		return Payment.objects.filter(user=user)

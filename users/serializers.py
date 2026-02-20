@@ -1,6 +1,11 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
+<<<<<<< task_5_Documentation_and_Security
+from courses.models import Course
+from users.models import User
+from users.models import Payment
+=======
 from users.models import User, Payments
 
 
@@ -8,6 +13,7 @@ class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Payments
         fields = "__all__"
+>>>>>>> develop
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -91,3 +97,28 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Неверный email или пароль")
         attrs["user"] = user
         return attrs
+
+
+class PaymentCreateSerializer(serializers.ModelSerializer):
+    course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all())
+
+    class Meta:
+        model = Payment
+        fields = ("course",)
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = (
+            "id",
+            "user",
+            "course",
+            "amount",
+            "stripe_product_id",
+            "stripe_price_id",
+            "stripe_session_id",
+            "payment_link",
+            "created_at",
+        )
+        read_only_fields = fields

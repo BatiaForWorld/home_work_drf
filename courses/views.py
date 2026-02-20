@@ -1,13 +1,24 @@
+from drf_yasg.utils import swagger_auto_schema
+from django.shortcuts import get_object_or_404
+from rest_framework.generics import (
+    CreateAPIView,
+    DestroyAPIView,
+    ListAPIView,
+    RetrieveAPIView,
+    UpdateAPIView,
+)
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
-from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveAPIView, UpdateAPIView, DestroyAPIView
-from django.shortcuts import get_object_or_404
 
 from courses.models import Course, Lesson, Subscription
 from courses.paginators import CourseLessonPagination
-from courses.serializers import CourseSerializer, LessonSerializer
+from courses.serializers import (
+    CourseSerializer,
+    LessonSerializer,
+    SubscriptionActionSerializer,
+)
 from users.permissions import IsModer, IsOwner
 
 
@@ -110,6 +121,7 @@ class LessonDestroyAPIView(DestroyAPIView):
 class SubscriptionAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @swagger_auto_schema(request_body=SubscriptionActionSerializer)
     def post(self, request, *args, **kwargs):
         """Добавляет или удаляет подписку пользователя на курс."""
         course_id = request.data.get("course_id")
