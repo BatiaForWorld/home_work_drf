@@ -67,3 +67,36 @@ class User(AbstractUser):
     class Meta:
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
+
+
+class Payment(models.Model):
+    user = models.ForeignKey(
+        "users.User",
+        on_delete=models.CASCADE,
+        related_name="stripe_payments",
+        verbose_name="Пользователь",
+        help_text="Укажите пользователя",
+    )
+    course = models.ForeignKey(
+        "courses.Course",
+        on_delete=models.CASCADE,
+        related_name="user_payments",
+        verbose_name="Курс",
+        help_text="Укажите курс",
+    )
+    amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name="Сумма платежа",
+        help_text="Укажите сумму платежа",
+    )
+    stripe_product_id = models.CharField(max_length=255, blank=True)
+    stripe_price_id = models.CharField(max_length=255, blank=True)
+    stripe_session_id = models.CharField(max_length=255, blank=True)
+    payment_link = models.URLField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Платеж"
+        verbose_name_plural = "Платежи"
+        ordering = ("-created_at",)

@@ -23,6 +23,13 @@ class Course(models.Model):
         verbose_name="Описание курса",
         help_text="Введите Описание курса",
     )
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Цена",
+        help_text="Укажите цену курса",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(
