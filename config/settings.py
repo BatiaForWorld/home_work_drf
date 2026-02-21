@@ -121,8 +121,14 @@ REST_FRAMEWORK = {
 }
 
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://example.com/success")
-STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://example.com/cancel")
+STRIPE_SUCCESS_URL = os.getenv(
+    "STRIPE_SUCCESS_URL",
+    "http://localhost:8000/users/payments/success/?session_id={CHECKOUT_SESSION_ID}",
+)
+STRIPE_CANCEL_URL = os.getenv(
+    "STRIPE_CANCEL_URL",
+    "http://localhost:8000/users/payments/cancel/",
+)
 
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {

@@ -30,6 +30,7 @@ from users.service import (
 	create_stripe_price,
 	create_stripe_product,
 	create_stripe_session,
+	retrieve_stripe_session,
 )
 
 
@@ -117,8 +118,14 @@ class PaymentCreateAPIView(CreateAPIView):
 		amount_in_kopecks = amount_to_kopecks(course.price)
 
 		try:
-			stripe_product = create_stripe_product(course.title, course.description or "")
-			stripe_price = create_stripe_price(stripe_product["id"], amount_in_kopecks)
+			product_id = course.stripe_product_id
+			if not product_id:
+				stripe_product = create_stripe_product(course.title, course.description or "")
+				product_id = stripe_product["id"]
+				course.stripe_product_id = product_id
+				course.save(update_fields=["stripe_product_id"])
+
+			stripe_price = create_stripe_price(product_id, amount_in_kopecks)
 			stripe_session = create_stripe_session(stripe_price["id"])
 		except stripe.error.StripeError as exc:
 			raise ValidationError({"stripe": str(exc)}) from exc
@@ -127,7 +134,7 @@ class PaymentCreateAPIView(CreateAPIView):
 			user=self.request.user,
 			course=course,
 			amount=course.price,
-			stripe_product_id=stripe_product["id"],
+			stripe_product_id=product_id,
 			stripe_price_id=stripe_price["id"],
 			stripe_session_id=stripe_session["id"],
 			payment_link=stripe_session["url"],
@@ -155,3 +162,39 @@ class PaymentListAPIView(ListAPIView):
 		if user.groups.filter(name="moderators").exists():
 			return Payment.objects.all()
 		return Payment.objects.filter(user=user)
+
+
+class PaymentStatusAPIView(APIView):
+	"""Проверяет статус платежа в Stripe по stripe_session_id."""
+
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request, stripe_session_id, *args, **kwargs):
+		"""Возвращает статус платежа из Stripe для доступного пользователю платежа."""
+		if request.user.groups.filter(name="moderators").exists():
+			payment = Payment.objects.filter(stripe_session_id=stripe_session_id).first()
+		else:
+			payment = Payment.objects.filter(
+				stripe_session_id=stripe_session_id,
+				user=request.user,
+			).first()
+
+		if not payment:
+			return Response(
+				{"detail": "Платеж не найден."},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		try:
+			session_data = retrieve_stripe_session(stripe_session_id)
+		except stripe.error.StripeError as exc:
+			raise ValidationError({"stripe": str(exc)}) from exc
+
+		return Response(
+			{
+				"payment_id": payment.id,
+				"stripe_session_id": stripe_session_id,
+				"status": session_data["status"],
+				"payment_status": session_data["payment_status"],
+			}
+		)

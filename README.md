@@ -4,10 +4,6 @@
 
 ### Вьюсеты и дженерики (viewsets and generics)
 
-и
-
-### Сериализаторы
-
 Для установки проекта создайте проект и импортируйте его по ссылке github
 
 Создайте виртуальное окружение
@@ -32,15 +28,6 @@ pip install -r requirements.txt
 
 ```bash
 python3 manage.py migrate
-```
-
-Загрузите фикстуры для заполнения БД
-
-```bash
-python3 manage.py loaddata users/fixtures/users.json
-python3 manage.py loaddata courses/fixtures/courses.json
-python3 manage.py loaddata courses/fixtures/lessons.json
-python3 manage.py loaddata users/fixtures/payments.json
 ```
 
 Скачайте [Postman](https://dl.pstmn.io/download/latest/linux_64) для вашего дистрибутива Linux, распакуйте в удобную для
@@ -134,6 +121,7 @@ coverage html -d htgmlcov
 Эндпоинты:
 - `GET /users/payments/` — список платежей пользователя (модератор видит все).
 - `POST /users/payments/create/` — создать платеж и получить ссылку на оплату (`payment_link`).
+- `GET /users/payments/status/<stripe_session_id>/` — проверить `payment_status` сессии в Stripe.
 
 При создании платежа система автоматически создаёт в Stripe:
 - Product
@@ -141,6 +129,10 @@ coverage html -d htgmlcov
 - Checkout Session
 
 Взаимодействие со Stripe вынесено в сервисные функции приложения `users`.
+
+В `.env` укажите реальные URL редиректа, а не заглушки:
+- `STRIPE_SUCCESS_URL=http://localhost:8000/users/payments/success/?session_id={CHECKOUT_SESSION_ID}`
+- `STRIPE_CANCEL_URL=http://localhost:8000/users/payments/cancel/`
 
 ## Полный сценарий запросов (curl)
 
@@ -207,6 +199,13 @@ curl -X POST http://localhost:8000/users/payments/create/ \
 
 ```bash
 curl -X GET http://localhost:8000/users/payments/ \
+	-H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
+```
+
+7) Проверить статус платежа по `stripe_session_id`:
+
+```bash
+curl -X GET http://localhost:8000/users/payments/status/cs_test_123/ \
 	-H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
 ```
 

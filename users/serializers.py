@@ -1,24 +1,11 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-<<<<<<< task_5_Documentation_and_Security
 from courses.models import Course
-from users.models import User
-from users.models import Payment
-=======
-from users.models import User, Payments
-
-
-class PaymentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payments
-        fields = "__all__"
->>>>>>> develop
+from users.models import Payment, User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    payments = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = (
@@ -29,15 +16,8 @@ class UserSerializer(serializers.ModelSerializer):
             "phone_number",
             "city",
             "avatar",
-            "payments",
         )
         read_only_fields = ("id", "email")
-
-    def get_payments(self, obj):
-        request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else obj
-        queryset = Payments.objects.filter(user=user)
-        return PaymentSerializer(queryset, many=True).data
 
 
 class UserPublicSerializer(serializers.ModelSerializer):

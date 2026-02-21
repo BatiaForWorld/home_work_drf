@@ -30,6 +30,12 @@ class Course(models.Model):
         verbose_name="Цена",
         help_text="Укажите цену курса",
     )
+    stripe_product_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Stripe Product ID",
+        help_text="Идентификатор продукта в Stripe",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(
