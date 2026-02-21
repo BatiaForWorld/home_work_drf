@@ -37,3 +37,14 @@ def create_stripe_session(price_id):
         mode="payment",
     )
     return {"id": session.id, "url": session.url}
+
+
+def retrieve_stripe_session(session_id):
+    """Возвращает JSON-данные сессии Stripe для проверки статуса платежа."""
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    session = stripe.checkout.Session.retrieve(session_id)
+    return {
+        "id": session.id,
+        "status": session.status,
+        "payment_status": session.payment_status,
+    }

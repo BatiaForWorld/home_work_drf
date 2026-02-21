@@ -9,6 +9,7 @@ from users.views import (
 	LogoutAPIView,
 	PaymentCreateAPIView,
 	PaymentListAPIView,
+	PaymentStatusAPIView,
 	UserProfileViewSet,
 	UserRegistrationAPIView,
 )
@@ -25,6 +26,11 @@ urlpatterns = [
 	path("logout/", LogoutAPIView.as_view(), name="logout"),
 	path("payments/", PaymentListAPIView.as_view(), name="payment_list"),
 	path("payments/create/", PaymentCreateAPIView.as_view(), name="payment_create"),
+	path(
+		"payments/status/<str:stripe_session_id>/",
+		PaymentStatusAPIView.as_view(),
+		name="payment_status",
+	),
 ]
 
 urlpatterns += router.urls

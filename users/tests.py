@@ -52,3 +52,41 @@ class PaymentTestCase(APITestCase):
 
 		self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 		self.assertIn("course", response.data)
+
+	@patch("users.views.retrieve_stripe_session")
+	def test_payment_status_success(self, retrieve_session_mock):
+		"""Возвращает статус платежа из Stripe по stripe_session_id."""
+		self.client.force_authenticate(user=self.user)
+
+		payment = Payment.objects.create(
+			user=self.user,
+			course=self.course,
+			amount=self.course.price,
+			stripe_product_id="prod_test",
+			stripe_price_id="price_test",
+			stripe_session_id="cs_test",
+			payment_link="https://checkout.stripe.com/test",
+		)
+
+		retrieve_session_mock.return_value = {
+			"id": "cs_test",
+			"status": "complete",
+			"payment_status": "paid",
+		}
+
+		url = reverse("users:payment_status", args=["cs_test"])
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(response.data["payment_id"], payment.id)
+		self.assertEqual(response.data["status"], "complete")
+		self.assertEqual(response.data["payment_status"], "paid")
+
+	def test_payment_status_not_found(self):
+		"""Возвращает 404, если платеж не принадлежит пользователю или отсутствует."""
+		self.client.force_authenticate(user=self.user)
+		url = reverse("users:payment_status", args=["cs_unknown"])
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+		self.assertEqual(response.data["detail"], "Платеж не найден.")
