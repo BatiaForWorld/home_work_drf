@@ -23,6 +23,19 @@ class Course(models.Model):
         verbose_name="Описание курса",
         help_text="Введите Описание курса",
     )
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        verbose_name="Цена",
+        help_text="Укажите цену курса",
+    )
+    stripe_product_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name="Stripe Product ID",
+        help_text="Идентификатор продукта в Stripe",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     owner = models.ForeignKey(
@@ -88,3 +101,30 @@ class Lesson(models.Model):
     class Meta:
         verbose_name = "Урок"
         verbose_name_plural = "Уроки"
+
+
+class Subscription(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+        verbose_name="Пользователь",
+        help_text="Укажите пользователя",
+    )
+    course = models.ForeignKey(
+        Course,
+        on_delete=models.CASCADE,
+        related_name="subscriptions",
+        verbose_name="Курс",
+        help_text="Укажите курс",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Подписка"
+        verbose_name_plural = "Подписки"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "course"], name="unique_user_course_subscription"
+            )
+        ]

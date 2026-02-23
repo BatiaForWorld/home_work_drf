@@ -1,8 +1,5 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
-from django.conf import settings
-
-from courses.models import Course, Lesson
 
 
 class UserManager(BaseUserManager):
@@ -72,60 +69,34 @@ class User(AbstractUser):
         verbose_name_plural = "Пользователи"
 
 
-class Payments(models.Model):
-    METHOD_CASH = "cash"
-    METHOD_TRANSFER = "transfer"
-    METHOD_CHOICES = (
-        (METHOD_CASH, "Наличные"),
-        (METHOD_TRANSFER, "Перевод на счет"),
-    )
-
+class Payment(models.Model):
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "users.User",
         on_delete=models.CASCADE,
-        related_name="payments",
+        related_name="stripe_payments",
         verbose_name="Пользователь",
         help_text="Укажите пользователя",
     )
-    date_payment = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name="Дата оплаты",
-        help_text="Укажите дату оплаты",
-    )
-    course_paid = models.ForeignKey(
-        Course,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="payments",
-        verbose_name="Оплаченный курс",
-        help_text="Выберите оплаченный курс",
-    )
-    lesson_paid = models.ForeignKey(
-        Lesson,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="payments",
-        verbose_name="Оплаченный урок",
-        help_text="Выберите оплаченный урок",
+    course = models.ForeignKey(
+        "courses.Course",
+        on_delete=models.CASCADE,
+        related_name="user_payments",
+        verbose_name="Курс",
+        help_text="Укажите курс",
     )
     amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
-        verbose_name="Сумма оплаты",
-        help_text="Укажите сумму оплаты",
+        verbose_name="Сумма платежа",
+        help_text="Укажите сумму платежа",
     )
-    method_payment = models.CharField(
-        max_length=20,
-        choices=METHOD_CHOICES,
-        verbose_name="Способ оплаты",
-        help_text="Выберите способ оплаты",
-    )
+    stripe_product_id = models.CharField(max_length=255, blank=True)
+    stripe_price_id = models.CharField(max_length=255, blank=True)
+    stripe_session_id = models.CharField(max_length=255, blank=True)
+    payment_link = models.URLField(max_length=1000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Платеж"
         verbose_name_plural = "Платежи"
-
-    def __str__(self):
-        return f"{self.user} - {self.amount}"
+        ordering = ("-created_at",)

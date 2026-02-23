@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from users.models import User
+from users.models import Payment, User
 
 
 @admin.register(User)
@@ -28,3 +28,9 @@ class UserAdmin(DjangoUserAdmin):
 			},
 		),
 	)
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+	list_display = ("id", "user", "course", "amount", "created_at")
+	search_fields = ("stripe_session_id", "stripe_product_id", "stripe_price_id")

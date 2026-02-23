@@ -1,18 +1,11 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from users.models import User, Payments
-
-
-class PaymentSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Payments
-        fields = "__all__"
+from courses.models import Course
+from users.models import Payment, User
 
 
 class UserSerializer(serializers.ModelSerializer):
-    payments = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = (
@@ -23,15 +16,8 @@ class UserSerializer(serializers.ModelSerializer):
             "phone_number",
             "city",
             "avatar",
-            "payments",
         )
         read_only_fields = ("id", "email")
-
-    def get_payments(self, obj):
-        request = self.context.get("request")
-        user = request.user if request and request.user.is_authenticated else obj
-        queryset = Payments.objects.filter(user=user)
-        return PaymentSerializer(queryset, many=True).data
 
 
 class UserPublicSerializer(serializers.ModelSerializer):
@@ -91,3 +77,28 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Неверный email или пароль")
         attrs["user"] = user
         return attrs
+
+
+class PaymentCreateSerializer(serializers.ModelSerializer):
+    course = serializers.PrimaryKeyRelatedField(queryset=Course.objects.all())
+
+    class Meta:
+        model = Payment
+        fields = ("course",)
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = (
+            "id",
+            "user",
+            "course",
+            "amount",
+            "stripe_product_id",
+            "stripe_price_id",
+            "stripe_session_id",
+            "payment_link",
+            "created_at",
+        )
+        read_only_fields = fields
