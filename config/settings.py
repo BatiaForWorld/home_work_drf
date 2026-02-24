@@ -2,6 +2,8 @@ from dotenv import load_dotenv
 from pathlib import Path
 import os
 
+from celery.schedules import crontab
+
 load_dotenv(override=True)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -95,7 +97,7 @@ SITE_ID = 1
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = os.getenv("TIME_ZONE", "UTC")
 
 USE_I18N = True
 
@@ -129,6 +131,28 @@ STRIPE_CANCEL_URL = os.getenv(
     "STRIPE_CANCEL_URL",
     "http://localhost:8000/users/payments/cancel/",
 )
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+REDIS_DB = os.getenv("REDIS_DB", "0")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+
+if REDIS_PASSWORD:
+    CELERY_BROKER_URL = (
+        f"redis://:{REDIS_PASSWORD}@{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+    )
+else:
+    CELERY_BROKER_URL = f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = USE_TZ
+CELERY_BEAT_SCHEDULE = {
+    "deactivate-inactive-users-daily": {
+        "task": "users.tasks.deactivate_inactive_users",
+        "schedule": crontab(minute=0, hour=3),
+    },
+}
 
 SWAGGER_SETTINGS = {
     "SECURITY_DEFINITIONS": {

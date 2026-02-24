@@ -1,5 +1,7 @@
 from drf_yasg.utils import swagger_auto_schema
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.generics import (
     CreateAPIView,
     DestroyAPIView,
@@ -19,6 +21,7 @@ from courses.serializers import (
     LessonSerializer,
     SubscriptionActionSerializer,
 )
+from courses.tasks import send_course_update_notification
 from users.permissions import IsModer, IsOwner
 
 
@@ -41,6 +44,16 @@ class CourseViewSet(ModelViewSet):
     def perform_create(self, serializer):
         """Сохраняет курс с владельцем из запроса."""
         serializer.save(owner=self.request.user)
+
+    def perform_update(self, serializer):
+        """Обновляет курс и отправляет уведомление подписчикам не чаще раза в 4 часа."""
+        course = serializer.instance
+        should_notify = (timezone.now() - course.updated_at) > timedelta(hours=4)
+
+        updated_course = serializer.save()
+
+        if should_notify:
+            send_course_update_notification.delay(updated_course.id)
 
     def get_permissions(self):
         """Назначает права доступа в зависимости от действия."""

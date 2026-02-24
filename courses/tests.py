@@ -1,5 +1,8 @@
 from django.contrib.auth.models import Group
 from django.urls import reverse
+from unittest.mock import patch
+from datetime import timedelta
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -124,3 +127,32 @@ class SubscriptionTestCase(APITestCase):
 		self.assertEqual(response.status_code, status.HTTP_200_OK)
 		self.assertIn("count", response.data)
 		self.assertIn("results", response.data)
+
+
+class CourseNotificationTestCase(APITestCase):
+	def setUp(self):
+		self.owner = User.objects.create_user(email="owner-notify@test.com", password="pass")
+		self.course = Course.objects.create(title="Notify course", owner=self.owner, price=100)
+
+	@patch("courses.views.send_course_update_notification.delay")
+	def test_notify_on_update_after_4_hours(self, task_delay_mock):
+		self.client.force_authenticate(user=self.owner)
+		Course.objects.filter(pk=self.course.pk).update(
+			updated_at=timezone.now() - timedelta(hours=5)
+		)
+
+		url = reverse("courses:courses-detail", args=[self.course.id])
+		response = self.client.patch(url, data={"description": "Updated"})
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		task_delay_mock.assert_called_once_with(self.course.id)
+
+	@patch("courses.views.send_course_update_notification.delay")
+	def test_skip_notify_if_less_than_4_hours(self, task_delay_mock):
+		self.client.force_authenticate(user=self.owner)
+
+		url = reverse("courses:courses-detail", args=[self.course.id])
+		response = self.client.patch(url, data={"description": "Updated quick"})
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		task_delay_mock.assert_not_called()

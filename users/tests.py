@@ -1,11 +1,14 @@
 from unittest.mock import patch
+from datetime import timedelta
 
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from courses.models import Course
 from users.models import Payment, User
+from users.tasks import deactivate_inactive_users
 
 
 class PaymentTestCase(APITestCase):
@@ -90,3 +93,24 @@ class PaymentTestCase(APITestCase):
 
 		self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 		self.assertEqual(response.data["detail"], "Платеж не найден.")
+
+
+class UserDeactivateTaskTestCase(APITestCase):
+	def test_deactivate_users_inactive_more_than_month(self):
+		inactive_user = User.objects.create_user(email="inactive@test.com", password="pass")
+		active_user = User.objects.create_user(email="active@test.com", password="pass")
+
+		inactive_user.last_login = timezone.now() - timedelta(days=31)
+		inactive_user.save(update_fields=["last_login"])
+
+		active_user.last_login = timezone.now() - timedelta(days=5)
+		active_user.save(update_fields=["last_login"])
+
+		updated_count = deactivate_inactive_users()
+
+		inactive_user.refresh_from_db()
+		active_user.refresh_from_db()
+
+		self.assertEqual(updated_count, 1)
+		self.assertFalse(inactive_user.is_active)
+		self.assertTrue(active_user.is_active)
