@@ -23,6 +23,11 @@ pip install -r requirements.txt
 - `STRIPE_SECRET_KEY`
 - `STRIPE_SUCCESS_URL`
 - `STRIPE_CANCEL_URL`
+И настройки Redis для Celery:
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_DB`
+- `REDIS_PASSWORD`
 
 Выполните миграции
 
@@ -213,6 +218,74 @@ curl -X GET http://localhost:8000/users/payments/status/cs_test_123/ \
 - получите новый `access` через `/users/token/refresh/`;
 - или заново войдите через `/users/login/`.
 - убедитесь, что на `/users/register/` и `/users/login/` вы не отправляете старый `Authorization`.
+
+## Celery и периодические задачи
+
+В проекте реализовано:
+- асинхронная рассылка подписчикам при обновлении курса;
+- ограничение рассылки: уведомление отправляется, только если курс не обновлялся более 4 часов;
+- периодическая задача блокировки пользователей, не заходивших более месяца.
+
+Запуск воркера Celery:
+
+```bash
+celery -A config worker -l info
+```
+
+Запуск celery-beat:
+
+```bash
+celery -A config beat -l info
+```
+
+
+#### A. Проверка рассылки при обновлении курса
+
+1) Получите `access` токен:
+- `POST /users/login/`
+- body:
+
+```json
+{
+	"email": "owner@test.com",
+	"password": "pass"
+}
+```
+
+2) Создайте курс (если его нет):
+- `POST /courses/`
+- Header: `Authorization: Bearer <access>`
+- body:
+
+```json
+{
+	"title": "Celery test course",
+	"description": "initial",
+	"price": 500
+}
+```
+
+3) Подпишите другого пользователя на курс:
+- `POST /courses/subscriptions/`
+- Header: `Authorization: Bearer <access_subscriber>`
+- body:
+
+```json
+{
+	"course_id": 1
+}
+```
+
+4) Обновите курс владельцем:
+- `PATCH /courses/1/`
+- Header: `Authorization: Bearer <access_owner>`
+- body:
+
+```json
+{
+	"description": "updated from postman"
+}
+```
 
 
 Автор: Казанцев Андрей
